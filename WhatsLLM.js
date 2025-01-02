@@ -4,8 +4,10 @@ const path = require('path');
 const readline = require('readline');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
-const { default: ollama } = require('ollama');
-const { search, translate } = require('@navetacandra/ddg');
+// const { default: ollama } = require('ollama');
+// const { search, translate } = require('@navetacandra/ddg');
+
+const commandPanel = require('./commandPanel');
 
 
 /**
@@ -29,13 +31,61 @@ function init() {
         if (!fs.existsSync(path.join(__dirname, 'securitySetting'))) {
             fs.mkdirSync(path.join(__dirname, 'securitySetting'));
         }
-        if (!fs.existsSync(path.join('secuitySetting', 'security.json'))) {
-            fs.writeFileSync(path.join('securitySetting', 'security.json'), JSON.stringify({}));
+        if (!fs.existsSync(path.join('securitySetting', 'security.json'))) {
+            fs.writeFileSync(path.join('securitySetting', 'security.json'), JSON.stringify({
+                admin: [],
+                password: '7355608',
+                moderator: []
+            }));
         }
     } catch (err) {
-        console.log('An error occured while initializing the environment: ', err);
+        console.log('An error occurred while initializing the environment: ', err);
     }
 }
 
+function getSecuritySettings() {
+    let securitySettings;
+    try {
+        securitySettings = JSON.parse(fs.readFileSync(path.join(__dirname, 'securitySetting', 'security.json'), 'utf-8'));
+    } catch (err) {
+        console.log('An error occurred while reading security settings: ', err);
+        return null;
+    }
+    return securitySettings;  // todo : Find a better way that covers the bad cases.
+}
 
+function createWhatsappConnection() {
+    let client;
+    client = new Client({
+        authStrategy: new LocalAuth({
+            dataPath: path.join(__dirname, 'whatsappSessions')
+        })
+    });
 
+    client.on('qr', (qr) => {
+        qrcode.generate(qr, {small: true});
+    });
+
+    client.initialize().then(r =>
+        console.log('Whatsapp connection initialized')
+    ).catch(err => {
+        console.log('An error occurred while initializing the Whatsapp connection ', err);
+        console.log('Attempting to clear the current session folder...');
+        try {
+            fs.rmdirSync(path.join(__dirname, 'whatsappSessions'), {recursive: true});
+            console.log('Session folder cleared, retrying...');
+            createWhatsappConnection();
+        } catch (err) {
+            console.log('An error occurred while clearing the session folder: ', err);
+            process.exit(5);
+        }
+    });
+}
+
+init();
+
+getSecuritySettings();
+
+createWhatsappConnection();
+
+module.exports = createWhatsappConnection;
