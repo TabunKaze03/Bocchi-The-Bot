@@ -34,8 +34,11 @@ function init() {
         if (!fs.existsSync(path.join('securitySetting', 'security.json'))) {
             fs.writeFileSync(path.join('securitySetting', 'security.json'), JSON.stringify({
                 admin: [],
-                password: '7355608',
-                moderator: []
+                moderator: [],
+                user: [],
+                banned: [],
+                superPassword: '7355608',
+                moderatorPassword: '123456'
             }));
         }
     } catch (err) {
@@ -51,7 +54,6 @@ function getSecuritySettings() {
         console.log('An error occurred while reading security settings: ', err);
         return null;
     }
-    return securitySettings;  // todo : Find a better way that covers the bad cases.
 }
 
 function createWhatsappConnection() {
@@ -88,4 +90,4 @@ getSecuritySettings();
 
 createWhatsappConnection();
 
-module.exports = createWhatsappConnection;
+module.exports = [createWhatsappConnection, getSecuritySettings];
