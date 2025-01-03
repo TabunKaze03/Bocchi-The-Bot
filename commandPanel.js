@@ -2,7 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const readline = require('readline');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia} = require('whatsapp-web.js');
 const { client, securitySettings, getSecuritySettings } = require('./WhatsLLM')
 /**
  * Script is for the command panel accessible from Whatsapp side.
@@ -15,44 +15,47 @@ const { client, securitySettings, getSecuritySettings } = require('./WhatsLLM')
  * Whatsapp message handler.
  */
 
-
-client.on('message', async (message) => {
-    let senderRole;
-    if (message.author === undefined) {
-        const sender = message.from;  // PM sender ID
-        if (securitySettings.admin.includes(sender)) {
-            senderRole = 'admin';
-        } else if (securitySettings.moderator.includes(sender)) {
-            senderRole = 'moderator';
-        } else if (securitySettings.user.includes(sender)) {
-            senderRole = 'user';
+try {
+    client.on('message', async (message) => {
+        let senderRole;
+        if (message.author === undefined) {
+            const sender = message.from;  // PM sender ID
+            if (securitySettings.admin.includes(sender)) {
+                senderRole = 'admin';
+            } else if (securitySettings.moderator.includes(sender)) {
+                senderRole = 'moderator';
+            } else if (securitySettings.user.includes(sender)) {
+                senderRole = 'user';
+            } else {
+                senderRole = 'banned';
+            }
         } else {
-            senderRole = 'banned';
+            const sender = message.author;  // Group sender ID
         }
-    } else {
-        const sender = message.author;  // Group sender ID
-    }
-    if (message.body.startsWith('!')) {
-        let command = message.body.split(' ')[0].substring(1);
-        let args = message.body.split(' ').slice(1);
-        switch (senderRole) {
-            case 'admin':
-                await adminCommand(command, args, message);
-                break;
-            case 'moderator':
-                moderatorCommand(command, args, message);
-                break;
-            case 'user':
-                userCommand(command, args, message);
-                break;
-            case 'banned':
-                message.reply('[!]You are banned from using this bot.');
-                break;
-            default:
-                unknownCommand(command, args, message);
+        if (message.body.startsWith('!')) {
+            let command = message.body.split(' ')[0].substring(1);
+            let args = message.body.split(' ').slice(1);
+            switch (senderRole) {
+                case 'admin':
+                    await adminCommand(command, args, message);
+                    break;
+                case 'moderator':
+                    moderatorCommand(command, args, message);
+                    break;
+                case 'user':
+                    userCommand(command, args, message);
+                    break;
+                case 'banned':
+                    message.reply('[!]You are banned from using this bot.');
+                    break;
+                default:
+                    unknownCommand(command, args, message);
+            }
         }
-    }
-});
+    });
+} catch (err) {
+    console.log('[!!!]An error occurred while handling messages: ', err);
+}
 
 
 
@@ -193,7 +196,7 @@ async function adminCommand(command, args, message) {
         case 'uploadBasePrompt':
             if ((args.includes(securitySettings.moderatorPassword) || args.includes(securitySettings.superPassword)) && message.hasMedia) {
                 const media = await message.downloadMedia();
-                if (media.filename.endsWith('.JSON')){
+                if (media.filename.endsWith('.JSON')) {
                     fs.writeFileSync(path.join(__dirname, 'basePrompt', media.filename), media.data);
                     console.log('[!!!]New base prompt uploaded by: ', message.from);
                     message.reply('[!]Base prompt uploaded successfully.');
@@ -263,6 +266,70 @@ async function adminCommand(command, args, message) {
                 message.reply('[!]Wrong password.');
             }
             break;
+
+        case 'registerChat':
+            if (!fs.existsSync(path.join(__dirname, 'chatHistory', message.from.replaceAll(/[^a-zA-Z0-9]/g, '-')))) {
+                fs.writeFileSync(path.join(__dirname, 'chatHistory', message.from.replaceAll(/[^a-zA-Z0-9]/g, '-')), '');
+                console.log('[!!]New chat registered at: ', message.from);
+                message.reply('[!]Chat registered.');
+            } else {
+                message.reply('[!]This chat is registered.');
+            }
+            break;
+
+        case 'deregisterChat':
+            if (fs.existsSync(path.join(__dirname, 'chatHistory', message.from.replaceAll(/[^a-zA-Z0-9]/g, '-')))) {
+                fs.unlinkSync(path.join(__dirname, 'chatHistory', message.from.replaceAll(/[^a-zA-Z0-9]/g, '-')));
+                console.log('[!!]Chat deregistered at: ', message.from);
+                message.reply('[!]Chat deregistered.');
+            } else {
+                message.reply('[!]This chat is not registered.');
+            }
+            break;
+
+        case 'history':
+            if (fs.existsSync(path.join(__dirname, 'chatHistory', message.from.replaceAll(/[^a-zA-Z0-9]/g, '-')))) {
+                const packagedJson = new MessageMedia.fromFilePath(path.join(__dirname, 'chatHistory', message.from.replaceAll(/[^a-zA-Z0-9]/g, '-')));
+                message.reply(packagedJson);
+                console.log('[!]Chat history sent to: ', message.from);
+            } else {
+                message.reply('[!]No chat history found.');
+            }
+            break;
+
+        case 'introduce':
+            const contacts = JSON.parse(fs.readFileSync(path.join(__dirname, 'chatHistory', 'contacts.json'), 'utf-8'));
+            if (contacts.includes(message.from)) {
+                contacts.splice(contacts.indexOf(message.from), 1);
+                contacts.push({[message.from]: args.join(' ')})
+                fs.writeFileSync(path.join(__dirname, 'chatHistory', 'contacts.json'), contacts)
+                console.log('[!]Contact updated by:', message.from);
+                message.reply('[!]Your name to the bot is updated.')
+            } else {
+                contacts.push({[message.from]: args.join(' ')})
+                fs.writeFileSync(path.join(__dirname, 'chatHistory', 'contacts.json'), contacts)
+                console.log('[!]Contact updated by:', message.from);
+                message.reply('[!]Your name to the bot is updated.')
+            }
+            break;
+
+        case 'lobotomy':
+            if (fs.existsSync(path.join(__dirname, 'chatHistory', message.from.replaceAll(/[^a-zA-Z0-9]/g, '-')))) {
+                fs.unlinkSync(path.join(__dirname, 'chatHistory', message.from.replaceAll(/[^a-zA-Z0-9]/g, '-')));
+                fs.writeFileSync(path.join(__dirname, 'chatHistory', message.from.replaceAll(/[^a-zA-Z0-9]/g, '-')), '');
+                console.log('[!]Chat history reset by: ', message.from);
+                message.reply('[!]Chat history reset.')
+            } else {
+                message.reply('[!]This chat is not registered.')
+            }
+            break;
+
+        case 'systemPrompt':
+            //  Todo : Finish this
+            //  Start from here next time.
+
+
+    }
 }
 
 
