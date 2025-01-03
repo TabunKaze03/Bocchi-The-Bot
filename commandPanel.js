@@ -3,11 +3,13 @@ const os = require('os');
 const path = require('path');
 const readline = require('readline');
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const { client, securitySettings } = require('./WhatsLLM')
+const { client, securitySettings, getSecuritySettings } = require('./WhatsLLM')
 /**
  * Script is for the command panel accessible from Whatsapp side.
  * A connection to Whatsapp is expected when this script runs.
  */
+
+
 
 /**
  * Whatsapp message handler.
@@ -35,7 +37,7 @@ client.on('message', async (message) => {
         let args = message.body.split(' ').slice(1);
         switch (senderRole) {
             case 'admin':
-                adminCommand(command, args, message);
+                await adminCommand(command, args, message);
                 break;
             case 'moderator':
                 moderatorCommand(command, args, message);
@@ -58,7 +60,7 @@ client.on('message', async (message) => {
  * These are the admin commands, they are only accessible to the admin.
  */
 
-function adminCommand(command, args, message) {
+async function adminCommand(command, args, message) {
     switch (command) {
         case 'ping':
             message.reply('[!]Online and ready to serve.');
@@ -71,11 +73,13 @@ function adminCommand(command, args, message) {
                 securitySettings.moderator.splice(securitySettings.moderator.indexOf(args[0]), 1);
                 securitySettings.admin.push(args[0]);
                 fs.writeFileSync(path.join(__dirname, 'securitySetting', 'security.json'), JSON.stringify(securitySettings));
+                getSecuritySettings();
                 console.log('[!!!]New ADMIN added: ', args[0], ' requested by: ', message.from);
             } else if (securitySettings.user.includes(args[0])) {
                 securitySettings.user.splice(securitySettings.user.indexOf(args[0]), 1);
                 securitySettings.admin.push(args[0]);
                 fs.writeFileSync(path.join(__dirname, 'securitySetting', 'security.json'), JSON.stringify(securitySettings));
+                getSecuritySettings();
                 console.log('[!!!]New ADMIN added: ', args[0], ' requested by: ', message.from);
             } else if (securitySettings.banned.includes(args[0])) {
                 message.reply('[!]User is banned, unbanned them first.');
@@ -93,6 +97,7 @@ function adminCommand(command, args, message) {
                 securitySettings.user.splice(securitySettings.user.indexOf(args[0]), 1);
                 securitySettings.moderator.push(args[0]);
                 fs.writeFileSync(path.join(__dirname, 'securitySetting', 'security.json'), JSON.stringify(securitySettings));
+                getSecuritySettings();
                 console.log('[!!!]New MODERATOR added: ', args[0], ' requested by: ', message.from);
             } else if (securitySettings.banned.includes(args[0])) {
                 message.reply('[!]User is banned, unbanned them first.');
@@ -108,6 +113,7 @@ function adminCommand(command, args, message) {
                 securitySettings.moderator.splice(securitySettings.moderator.indexOf(args[0]), 1);
                 securitySettings.user.push(args[0]);
                 fs.writeFileSync(path.join(__dirname, 'securitySetting', 'security.json'), JSON.stringify(securitySettings));
+                getSecuritySettings();
                 console.log('[!!]New USER added: ', args[0], ' requested by: ', message.from);
             } else if (securitySettings.user.includes(args[0])) {
                 message.reply('[!]User is already a user.');
@@ -115,10 +121,12 @@ function adminCommand(command, args, message) {
                 securitySettings.banned.splice(securitySettings.banned.indexOf(args[0]), 1);
                 securitySettings.user.push(args[0]);
                 fs.writeFileSync(path.join(__dirname, 'securitySetting', 'security.json'), JSON.stringify(securitySettings));
+                getSecuritySettings();
                 console.log('[!!!]USER unbanned: ', args[0], ' requested by: ', message.from);
             } else {
                 securitySettings.user.push(args[0]);
                 fs.writeFileSync(path.join(__dirname, 'securitySetting', 'security.json'), JSON.stringify(securitySettings));
+                getSecuritySettings();
                 console.log('[!!]New USER added: ', args[0], ' requested by: ', message.from);
             }
             break;
@@ -130,11 +138,13 @@ function adminCommand(command, args, message) {
                 securitySettings.moderator.splice(securitySettings.moderator.indexOf(args[0]), 1);
                 securitySettings.banned.push(args[0]);
                 fs.writeFileSync(path.join(__dirname, 'securitySetting', 'security.json'), JSON.stringify(securitySettings));
+                getSecuritySettings();
                 console.log('[!!!]MODERATOR ', args[0], ' is banned, requested by: ', message.from);
             } else if (securitySettings.user.includes(args[0])) {
                 securitySettings.user.splice(securitySettings.user.indexOf(args[0]), 1);
                 securitySettings.banned.push(args[0]);
                 fs.writeFileSync(path.join(__dirname, 'securitySetting', 'security.json'), JSON.stringify(securitySettings));
+                getSecuritySettings();
                 console.log('[!!]USER ', args[0], ' is banned, requested by: ', message.from);
             } else if (securitySettings.banned.includes(args[0])) {
                 message.reply('[!]User is already banned.');
@@ -147,6 +157,7 @@ function adminCommand(command, args, message) {
             if (securitySettings.moderatorPassword === args[0]) {
                 securitySettings.moderatorPassword = args[1];
                 fs.writeFileSync(path.join(__dirname, 'securitySetting', 'security.json'), JSON.stringify(securitySettings));
+                getSecuritySettings();
                 console.log('[!!!]Moderator password changed by: ', message.from);
                 message.reply('[!]Moderator password changed successfully.');
             } else {
@@ -179,7 +190,79 @@ function adminCommand(command, args, message) {
             }
             break;
 
-    }
+        case 'uploadBasePrompt':
+            if ((args.includes(securitySettings.moderatorPassword) || args.includes(securitySettings.superPassword)) && message.hasMedia) {
+                const media = await message.downloadMedia();
+                if (media.filename.endsWith('.JSON')){
+                    fs.writeFileSync(path.join(__dirname, 'basePrompt', media.filename), media.data);
+                    console.log('[!!!]New base prompt uploaded by: ', message.from);
+                    message.reply('[!]Base prompt uploaded successfully.');
+                } else {
+                    message.reply('[!]Invalid file format or illegal file.');
+                }
+            } else {
+                message.reply('[!]Wrong password or no file attached.');
+            }
+            break;
+
+        case 'allowMedia':
+            //  Todo : Implement this after setting up the Ollama tool calling.
+            break;
+
+        case 'uploadPfp':
+            if ((args.includes(securitySettings.moderatorPassword) || args.includes(securitySettings.superPassword)) && message.hasMedia) {
+                const media = await message.downloadMedia();
+                if (await client.setProfilePicture(media)) {
+                    console.log('[!!]Profile picture changed by: ', message.from);
+                    message.reply('[!]Profile picture changed successfully.');
+                } else {
+                    message.reply('[!]Failed to change profile picture.');
+                }
+            } else {
+                message.reply('[!]Wrong password or no photo attached.');
+            }
+            break;
+
+        case 'setStatus':
+            await client.setStatus(args.join(' '));
+            console.log('[!!]Status updated by: ', message)
+            message.reply('[!]Status updated successfully.');
+            break;
+
+        case 'setName':
+            if (args.includes(securitySettings.superPassword) || args.includes(securitySettings.moderatorPassword)) {
+                const newName = args.splice(0, 1).join(' ');
+                if (newName.includes(securitySettings.superPassword) || newName.includes(securitySettings.moderatorPassword)) {
+                    message.reply('[!]Invalid name.');
+                } else {
+                    await client.setDisplayName(newName);
+                    console.log('[!!]Client name changed by: ', message.from);
+                    message.reply('[!]Client name changed successfully.');
+                }
+            } else {
+                message.reply('[!]Wrong password.');
+            }
+            break;
+
+        case 'available':
+            if (args.includes(securitySettings.superPassword) || args.includes(securitySettings.moderatorPassword)) {
+                await client.sendPresenceAvailable();
+                console.log('[!!]Client is now marked as online by: ', message.from);
+                message.reply('[!]Client is now marked online.');
+            } else {
+                message.reply('[!]Wrong password.');
+            }
+            break;
+
+        case 'unavailable':
+            if (args.includes(securitySettings.superPassword) || args.includes(securitySettings.moderatorPassword)) {
+                await client.sendPresenceUnavailable();
+                console.log('[!!]Client is now marked as offline by: ', message.from);
+                message.reply('[!]Client is now marked offline.');
+            } else {
+                message.reply('[!]Wrong password.');
+            }
+            break;
 }
 
 

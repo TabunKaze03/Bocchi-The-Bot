@@ -52,7 +52,7 @@ function getSecuritySettings() {
         securitySettings = JSON.parse(fs.readFileSync(path.join(__dirname, 'securitySetting', 'security.json'), 'utf-8'));
     } catch (err) {
         console.log('An error occurred while reading security settings: ', err);
-        return null;
+        process.exit(4);
     }
 }
 
