@@ -21,6 +21,9 @@ function init() {
         }
         if (!fs.existsSync(path.join(__dirname, 'chatHistory'))) {
             fs.mkdirSync(path.join(__dirname, 'chatHistory'));
+            fs.writeFileSync(path.join(__dirname, 'chatHistory', 'contacts.json'), JSON.stringify({
+
+            }));
         }
         if (!fs.existsSync(path.join(__dirname, 'whatsappMedia'))) {
             fs.mkdirSync(path.join(__dirname, 'whatsappMedia'));
@@ -59,9 +62,10 @@ function getSecuritySettings() {
 function createWhatsappConnection() {
     let client;
     client = new Client({
-        authStrategy: new LocalAuth({
-            dataPath: path.join(__dirname, 'whatsappSessions')
-        })
+        authStrategy: new LocalAuth({dataPath: path.join(__dirname, 'whatsappSessions')}),
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        qrMaxRetries: 10
+        //  You may add more options here.
     });
 
     client.on('qr', (qr) => {
